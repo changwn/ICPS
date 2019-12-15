@@ -13,6 +13,81 @@ devtools::install_github("changwn/ICPS")
 ```
 
 ## Example
+```
+#-------------------------------
+#
+#  seurat clustering, plot tSNE
+#
+#-------------------------------
+
+#---seurat
+MAT <- scData
+library(Seurat)
+MAT_seurat<-CreateSeuratObject(counts = MAT, project = "MAT", min.cells = 3, min.features = 200)
+MAT_seurat[["percent.mt"]] <- PercentageFeatureSet(MAT_seurat, pattern = "^mt-")
+#VlnPlot(MAT_seurat, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+MAT_seurat <- NormalizeData(MAT_seurat)
+MAT_seurat<-FindVariableFeatures(MAT_seurat, selection.method = "vst", nfeatures = 2000)
+all.genes <- rownames(MAT_seurat)
+MAT_seurat <- ScaleData(MAT_seurat, features = all.genes)
+MAT_seurat <- RunPCA(MAT_seurat, features = VariableFeatures(object = MAT_seurat))
+#MAT_seurat <- RunPCA(MAT_seurat, features = marker_gene) #use default seurat, no marker gene
+MAT_seurat <- JackStraw(MAT_seurat, num.replicate = 100)
+MAT_seurat <- ScoreJackStraw(MAT_seurat, dims = 1:20)
+#JackStrawPlot(MAT_seurat, dims = 1:20)
+#ElbowPlot(MAT_seurat)
+MAT_seurat <- FindNeighbors(MAT_seurat, dims = 1:20)
+MAT_seurat <- FindClusters(MAT_seurat, resolution = 0.5)
+MAT_seurat <- RunTSNE(MAT_seurat, dims = 1:20)
+DimPlot(MAT_seurat, reduction = "tsne", label=T)
+MAT_ident<-as.vector(MAT_seurat@meta.data[,6])
+names(MAT_ident) <- rownames(MAT_seurat@meta.data)
+
+library(cluster)
+tsne_position <- MAT_seurat@reductions$tsne@cell.embeddings
+test_dist<-dist(tsne_position,method = "canberra")
+cluster_label <- strtoi(MAT_ident, base = 0L)
+sil<-silhouette(cluster_label,test_dist)
+sum(sil[,3])
+
+#----------------------
+#
+# ICPS: simulate using seurat cluster label, run ictd, clustering using ctes3 marker
+#
+#----------------------
+
+pseudo_BULK <- Bulk_Simu_no_coinfil_v1(scData, MAT_ident, cellNumber=10000, sampleNumber=50)
+data_matrix_simu <- pseudo_BULK[[1]]
+tProp <- pseudo_BULK[[2]]
+
+library(ICTD)
+CTES3 <- ICTD(data_matrix_simu)
+
+MAT <- scData
+ictd_genelist <- extract_list(CTES3)
+#ictd_genelist <- extract_list(tg_R1_lists)
+library(Seurat)
+MAT_seurat_mtct<-CreateSeuratObject(counts = MAT, project = "MAT", min.cells = 3, min.features = 200)
+MAT_seurat_mtct[["percent.mt"]] <- PercentageFeatureSet(MAT_seurat_mtct, pattern = "^mt-")
+#VlnPlot(MAT_seurat_mtct, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+MAT_seurat_mtct <- NormalizeData(MAT_seurat_mtct)
+MAT_seurat_mtct<-FindVariableFeatures(MAT_seurat_mtct, selection.method = "vst", nfeatures = 2000)
+all.genes <- rownames(MAT_seurat_mtct)
+MAT_seurat_mtct <- ScaleData(MAT_seurat_mtct, features = all.genes)
+#MAT_seurat <- RunPCA(MAT_seurat, features = VariableFeatures(object = MAT_seurat))
+MAT_seurat_mtct <- RunPCA(MAT_seurat_mtct, features = ictd_genelist)
+MAT_seurat_mtct <- JackStraw(MAT_seurat_mtct, num.replicate = 100)
+MAT_seurat_mtct <- ScoreJackStraw(MAT_seurat_mtct, dims = 1:20)
+#JackStrawPlot(MAT_seurat_mtct, dims = 1:20)
+#ElbowPlot(MAT_seurat_mtct)
+MAT_seurat_mtct <- FindNeighbors(MAT_seurat_mtct, dims = 1:20)
+MAT_seurat_mtct <- FindClusters(MAT_seurat_mtct, resolution = 0.5)
+MAT_seurat_mtct <- RunTSNE(MAT_seurat_mtct, dims = 1:20)
+DimPlot(MAT_seurat_mtct, reduction = "tsne", label=T)
+
+MAT_ident_mtct<-as.vector(MAT_seurat_mtct@meta.data[,6])
+names(MAT_ident_mtct) <- rownames(MAT_seurat_mtct@meta.data)
+```
 
 
 ## Instruction
